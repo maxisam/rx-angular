@@ -73,7 +73,7 @@ export class CacheGeneration {
         this.logger.info('Another generation is on-going for this url...');
         return;
       }
-      this.logger.info(`The url: ${cacheKey} is being generated.`);
+      this.logger.info(`The url: ${cacheKey} is being ${mode}.`);
 
       this.urlsOnHold.push(cacheKey);
     }
@@ -87,10 +87,14 @@ export class CacheGeneration {
       bootstrap: this.isrConfig.bootstrap,
       browserDistFolder: this.isrConfig.browserDistFolder,
       inlineCriticalCss: this.isrConfig.inlineCriticalCss,
+      logger: this.logger,
     };
     try {
       const html = await renderUrl(renderUrlConfig);
       const { revalidate, errors } = getRouteISRDataFromHTML(html);
+      this.logger.debug(
+        `Revalidate time for cacheKey: ${cacheKey}: ${revalidate}`,
+      );
 
       // Apply the modify generation callback
       // If undefined, use the default modifyGeneratedHtml function
@@ -100,6 +104,7 @@ export class CacheGeneration {
       let cacheString: string = finalHtml;
       // Apply the compressHtml callback
       if (this.isrConfig.compressHtml) {
+        this.logger.debug('Compressing HTML...');
         finalHtml = await this.isrConfig.compressHtml(finalHtml);
         cacheString = bufferToString(finalHtml);
       }
@@ -120,6 +125,7 @@ export class CacheGeneration {
       // if revalidate is 0, we will never clear the cache automatically
       // if revalidate is x, we will clear cache every x seconds (after the last request) for that url
       if (revalidate === null || revalidate === undefined) {
+        this.logger.debug('Revalidate is null, not caching...');
         // don't do !revalidate because it will also catch "0"
         return { html: finalHtml };
       }
@@ -134,14 +140,17 @@ export class CacheGeneration {
 
       try {
         if (this.isrConfig.nonBlockingRender) {
+          this.logger.debug('Adding to cache without waiting...');
           // If enabled, add to cache without waiting (fire-and-forget)
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           addToCache();
         } else {
+          this.logger.debug('Adding to cache...');
           // If not enabled, wait for cache addition to complete before proceeding
           await addToCache();
         }
       } catch (error) {
-        console.error('Error adding to cache:', error);
+        this.logger.error('Error adding to cache', error);
       }
 
       if (mode === 'regenerate') {
@@ -152,7 +161,7 @@ export class CacheGeneration {
 
       return { html: finalHtml };
     } catch (error) {
-      this.logger.error(`Error regenerating url: ${cacheKey}`, error);
+      this.logger.error(`Error ${mode} url: ${cacheKey}`, error);
 
       if (mode === 'regenerate') {
         // Ensure removal from urlsOnHold in case of error
