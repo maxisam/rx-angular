@@ -177,13 +177,20 @@ export class ISRHandler {
     config?: ServeFromCacheConfig,
   ): Promise<Response | void> {
     try {
+      this.logger.debug('trying to serve from cache...');
       const variant = getVariant(req, this.isrConfig.variants);
+      this.logger.debug('variant: ', variant);
       const cacheKey = this.cacheGeneration.getCacheKey(
         req.url,
         this.isrConfig.allowedQueryParams,
         variant,
       );
+      this.logger.debug(`cacheKey: ${cacheKey}`);
       const cacheData = await this.cache.get(cacheKey);
+      this.logger.debug(
+        `cacheData: CreatedAt: ${cacheData.createdAt}, Options:`,
+        cacheData.options,
+      );
       const { html, options: cacheConfig, createdAt } = cacheData;
 
       const cacheHasBuildId =
@@ -191,12 +198,15 @@ export class ISRHandler {
 
       if (cacheHasBuildId && cacheConfig.buildId !== this.isrConfig.buildId) {
         // Cache is from a different build. Serve user using SSR
+        this.logger.debug(
+          `Cache is from a different build: ${cacheConfig.buildId}, request buildId: ${this.isrConfig.buildId}`,
+        );
         next();
         return;
       }
 
       // Cache exists. Send it.
-      this.logger.info(`Page was retrieved from cache: `, cacheKey);
+      this.logger.info(`Page was retrieved from cache: ${cacheKey}`);
       let finalHtml: string | Buffer = html;
 
       if (this.isrConfig.compressHtml) {
@@ -206,8 +216,14 @@ export class ISRHandler {
       // if the cache is expired, we will regenerate it
       if (cacheConfig.revalidate && cacheConfig.revalidate > 0) {
         const lastCacheDateDiff = (Date.now() - createdAt) / 1000; // in seconds
+        this.logger.debug(
+          `validating cache revalidation time cache revalidate: ${cacheConfig.revalidate}, lastCacheDateDiff: ${lastCacheDateDiff}`,
+        );
 
         if (lastCacheDateDiff > cacheConfig.revalidate) {
+          this.logger.debug(
+            `Cache is expired. Regenerating the page for: ${cacheKey}`,
+          );
           const generate = () => {
             return this.cacheGeneration.generateWithCacheKey(
               req,
@@ -221,15 +237,22 @@ export class ISRHandler {
           try {
             // regenerate the page without awaiting, so the user gets the cached page immediately
             if (this.isrConfig.backgroundRevalidation) {
+              this.logger.debug(
+                'Background revalidation is enabled. Regenerating the page in the background.',
+              );
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               generate();
             } else {
+              this.logger.debug(
+                'Background revalidation is disabled. Regenerating the page synchronously.',
+              );
               const result = await generate();
               if (result?.html) {
                 finalHtml = result.html;
               }
             }
           } catch (error) {
-            console.error('Error generating html', error);
+            this.logger.error('Error generating html', error);
             next();
           }
         }
@@ -246,6 +269,9 @@ export class ISRHandler {
           This resulted into more ${totalTime}ms of processing time.\n-->`;
         }
       } else {
+        this.logger.debug(
+          'Cache is compressed. Skipping modifyCachedHtml and set compress header.',
+        );
         setCompressHeader(res, this.isrConfig.htmlCompressionMethod);
       }
 

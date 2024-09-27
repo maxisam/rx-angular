@@ -2,6 +2,7 @@ import { APP_BASE_HREF } from '@angular/common';
 import { Provider, StaticProvider } from '@angular/core';
 import { ɵSERVER_CONTEXT as SERVER_CONTEXT } from '@angular/platform-server';
 import { CommonEngine, CommonEngineRenderOptions } from '@angular/ssr';
+import { ILogger } from '@rx-angular/isr/models';
 import { Request, Response } from 'express';
 
 export interface RenderUrlConfig {
@@ -14,6 +15,7 @@ export interface RenderUrlConfig {
   bootstrap?: CommonEngineRenderOptions['bootstrap'];
   browserDistFolder?: string;
   inlineCriticalCss?: boolean;
+  logger?: ILogger;
 }
 
 const EXTRA_PROVIDERS: Provider[] = [
@@ -32,6 +34,7 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
     bootstrap,
     browserDistFolder,
     inlineCriticalCss,
+    logger,
   } = options;
 
   // we need to override url of req with the one we have in parameters,
@@ -51,6 +54,9 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
       : [...EXTRA_PROVIDERS, BASE_URL_PROVIDER]; // if not, we add the default providers
 
     if (commonEngine) {
+      logger?.debug(
+        `Rendering url: ${protocol}://${headers.host}${originalUrl} with common engine from ${indexHtml}`,
+      );
       commonEngine
         .render({
           bootstrap,
@@ -61,19 +67,24 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
           providers: [...allProviders] as StaticProvider[], // we need to cast to StaticProvider[] because of a bug in the types
         })
         .then((html) => {
+          logger?.debug('done rendering url with common engine', html);
           resolve(html);
         })
         .catch((err) => {
+          logger?.error('Error: rendering url with common engine', err);
           reject(err);
         });
     } else {
+      logger?.debug('Rendering url with express');
       res.render(
         indexHtml,
         { req, providers: allProviders },
         (err: Error, html: string) => {
           if (err) {
+            logger?.error('Error: rendering url with express', err);
             reject(err);
           } else {
+            logger?.debug('done rendering url with express', html);
             resolve(html);
           }
         },
