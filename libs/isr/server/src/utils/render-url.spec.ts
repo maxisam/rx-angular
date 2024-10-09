@@ -1,5 +1,6 @@
 import { CommonEngine } from '@angular/ssr';
 import { Request, Response } from 'express';
+import { ILogger } from '../../../models/src/logger';
 import { renderUrl, RenderUrlConfig } from './render-url';
 
 jest.useFakeTimers();
@@ -8,7 +9,7 @@ describe('renderUrl - Timeout Test', () => {
   let mockRequest: Request;
   let mockResponse: Response;
   let mockCommonEngine: CommonEngine;
-  let mockLogger: any;
+  let mockLogger: ILogger;
 
   beforeEach(() => {
     mockRequest = {
@@ -35,6 +36,8 @@ describe('renderUrl - Timeout Test', () => {
     mockLogger = {
       debug: jest.fn(),
       error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
     };
   });
 

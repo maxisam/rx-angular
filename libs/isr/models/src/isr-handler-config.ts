@@ -159,7 +159,7 @@ export interface ISRHandlerConfig {
    * If the rendering takes longer than this timeout, the rendering will be stopped and an error will be thrown.
    * This is useful to prevent the server from hanging on a request that takes too long to render.
    **/
-  renderingTimeoutMs: number | undefined;
+  renderingTimeoutMs?: number | undefined;
 }
 
 export interface ServeFromCacheConfig {
