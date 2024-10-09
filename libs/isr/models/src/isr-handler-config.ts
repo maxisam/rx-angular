@@ -153,6 +153,13 @@ export interface ISRHandlerConfig {
    * This is for logger level, if undefined, it will use the default logger level, INFO
    */
   logLevel?: LogLevelString;
+
+  /**
+   * This is for rendering timeout in milliseconds, if undefined, it will use the default timeout, 10000ms
+   * If the rendering takes longer than this timeout, the rendering will be stopped and an error will be thrown.
+   * This is useful to prevent the server from hanging on a request that takes too long to render.
+   **/
+  renderingTimeoutMs: number | undefined;
 }
 
 export interface ServeFromCacheConfig {

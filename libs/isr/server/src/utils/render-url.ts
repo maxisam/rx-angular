@@ -16,6 +16,7 @@ export interface RenderUrlConfig {
   browserDistFolder?: string;
   inlineCriticalCss?: boolean;
   logger?: ILogger;
+  timeoutMs?: number; // Added a timeout configuration parameter
 }
 
 const EXTRA_PROVIDERS: Provider[] = [
@@ -35,10 +36,9 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
     browserDistFolder,
     inlineCriticalCss,
     logger,
+    timeoutMs = 10000, // default timeout is 10 seconds
   } = options;
 
-  // we need to override url of req with the one we have in parameters,
-  // because during invalidate process, the url is not from the request
   req.url = url;
   req.originalUrl = url;
 
@@ -57,22 +57,40 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
       logger?.debug(
         `Rendering url: ${protocol}://${headers.host}${originalUrl} with common engine from ${indexHtml}`,
       );
-      commonEngine
-        .render({
-          bootstrap,
-          documentFilePath: indexHtml,
-          url: `${protocol}://${headers.host}${originalUrl}`,
-          publicPath: browserDistFolder,
-          inlineCriticalCss: inlineCriticalCss ?? true,
-          providers: [...allProviders] as StaticProvider[], // we need to cast to StaticProvider[] because of a bug in the types
-        })
+
+      // Set a timeout for the rendering operation
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise<never>((_, rejectTimeout) => {
+        timeoutId = setTimeout(() => {
+          rejectTimeout(new Error(`Rendering timeout after ${timeoutMs} ms`));
+        }, timeoutMs);
+      });
+
+      // Rendering promise
+      const renderPromise = commonEngine.render({
+        bootstrap,
+        documentFilePath: indexHtml,
+        url: `${protocol}://${headers.host}${originalUrl}`,
+        publicPath: browserDistFolder,
+        inlineCriticalCss: inlineCriticalCss ?? true,
+        providers: [...allProviders] as StaticProvider[], // we need to cast to StaticProvider[] because of a bug in the types
+      });
+
+      // Use Promise.race to race between the render and timeout
+      // until this issue is solved https://github.com/angular/angular/issues/51549
+      Promise.race([renderPromise, timeoutPromise])
         .then((html) => {
-          logger?.debug('done rendering url with common engine', html);
-          resolve(html);
+          logger?.debug(
+            `done rendering url with common engine: ${html.substring(0, 200)}...`,
+          );
+          resolve(html as string);
         })
         .catch((err) => {
           logger?.error('Error: rendering url with common engine', err);
           reject(err);
+        })
+        .finally(() => {
+          clearTimeout(timeoutId); // Clear the timeout once rendering is done or fails
         });
     } else {
       logger?.debug('Rendering url with express');
@@ -84,7 +102,9 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
             logger?.error('Error: rendering url with express', err);
             reject(err);
           } else {
-            logger?.debug('done rendering url with express', html);
+            logger?.debug(
+              `done rendering url with express: ${html.substring(0, 200)}...`,
+            );
             resolve(html);
           }
         },
