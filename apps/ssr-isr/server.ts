@@ -41,6 +41,7 @@ export function app(): express.Express {
     modifyGeneratedHtml: customModifyGeneratedHtml,
     compressHtml: compressHtml, // compress the html before storing in cache
     logger: new customLogger(),
+    renderingTimeoutMs: 5000, // 5 seconds timeout for rendering
     // cacheHtmlCompressionMethod: 'gzip', // compression method for cache
     // cache: fsCacheHandler,
   });

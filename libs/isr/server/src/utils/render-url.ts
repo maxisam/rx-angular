@@ -83,7 +83,7 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
           logger?.debug(
             `done rendering url with common engine: ${html.substring(0, 200)}...`,
           );
-          resolve(html as string);
+          resolve(html);
         })
         .catch((err) => {
           logger?.error('Error: rendering url with common engine', err);
