@@ -88,6 +88,7 @@ export class CacheGeneration {
       browserDistFolder: this.isrConfig.browserDistFolder,
       inlineCriticalCss: this.isrConfig.inlineCriticalCss,
       logger: this.logger,
+      timeoutMs: this.isrConfig.renderingTimeoutMs,
     };
     try {
       const html = await renderUrl(renderUrlConfig);
