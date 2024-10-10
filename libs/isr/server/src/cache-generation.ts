@@ -9,7 +9,6 @@ import {
 import { Request, Response } from 'express';
 import { defaultModifyGeneratedHtml } from './modify-generated-html';
 import { defaultCacheKeyGenerator, getVariant } from './utils/cache-utils';
-import { bufferToString } from './utils/compression-utils';
 import { DEFAULT_CACHE_TIMEOUT } from './utils/constants';
 import { getRouteISRDataFromHTML } from './utils/get-isr-options';
 import { renderUrl, RenderUrlConfig } from './utils/render-url';
@@ -104,12 +103,10 @@ export class CacheGeneration {
       let finalHtml: string | Buffer = this.isrConfig.modifyGeneratedHtml
         ? this.isrConfig.modifyGeneratedHtml(req, html, revalidate)
         : defaultModifyGeneratedHtml(req, html, revalidate);
-      let cacheString: string = finalHtml;
       // Apply the compressHtml callback
       if (this.isrConfig.compressHtml) {
         this.logger.debug('Compressing HTML...');
         finalHtml = await this.isrConfig.compressHtml(finalHtml);
-        cacheString = bufferToString(finalHtml);
       }
       // if there are errors, don't add the page to cache
       if (errors?.length && this.isrConfig.skipCachingOnHttpError) {
@@ -137,7 +134,7 @@ export class CacheGeneration {
       const addToCache = async () => {
         try {
           await executeWithTimeout(
-            this.cache.add(cacheKey, cacheString, {
+            this.cache.add(cacheKey, finalHtml, {
               revalidate,
               buildId: this.isrConfig.buildId,
             }),
