@@ -4,6 +4,7 @@ import { ɵSERVER_CONTEXT as SERVER_CONTEXT } from '@angular/platform-server';
 import { CommonEngine, CommonEngineRenderOptions } from '@angular/ssr';
 import { ILogger } from '@rx-angular/isr/models';
 import { Request, Response } from 'express';
+import { executeWithTimeout } from './timeout';
 
 export interface RenderUrlConfig {
   req: Request;
@@ -58,14 +59,6 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
         `Rendering url: ${protocol}://${headers.host}${originalUrl} with common engine from ${indexHtml}`,
       );
 
-      // Set a timeout for the rendering operation
-      let timeoutId: NodeJS.Timeout;
-      const timeoutPromise = new Promise<never>((_, rejectTimeout) => {
-        timeoutId = setTimeout(() => {
-          rejectTimeout(new Error(`Rendering timeout after ${timeoutMs} ms`));
-        }, timeoutMs);
-      });
-
       // Rendering promise
       const renderPromise = commonEngine.render({
         bootstrap,
@@ -76,9 +69,12 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
         providers: [...allProviders] as StaticProvider[], // we need to cast to StaticProvider[] because of a bug in the types
       });
 
-      // Use Promise.race to race between the render and timeout
-      // until this issue is solved https://github.com/angular/angular/issues/51549
-      Promise.race([renderPromise, timeoutPromise])
+      // handle timeout manually until this issue is solved https://github.com/angular/angular/issues/51549
+      executeWithTimeout(
+        renderPromise,
+        timeoutMs,
+        `Rendering timeout after ${timeoutMs} ms`,
+      )
         .then((html) => {
           logger?.debug(
             `done rendering url with common engine: ${html.substring(0, 200)}...`,
@@ -88,9 +84,6 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
         .catch((err) => {
           logger?.error('Error: rendering url with common engine', err);
           reject(err);
-        })
-        .finally(() => {
-          clearTimeout(timeoutId); // Clear the timeout once rendering is done or fails
         });
     } else {
       logger?.debug('Rendering url with express');
