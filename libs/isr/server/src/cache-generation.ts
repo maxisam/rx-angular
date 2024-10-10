@@ -10,8 +10,10 @@ import { Request, Response } from 'express';
 import { defaultModifyGeneratedHtml } from './modify-generated-html';
 import { defaultCacheKeyGenerator, getVariant } from './utils/cache-utils';
 import { bufferToString } from './utils/compression-utils';
+import { DEFAULT_CACHE_TIMEOUT } from './utils/constants';
 import { getRouteISRDataFromHTML } from './utils/get-isr-options';
 import { renderUrl, RenderUrlConfig } from './utils/render-url';
+import { executeWithTimeout } from './utils/timeout';
 
 export interface IGeneratedResult {
   html?: string | Buffer;
@@ -132,11 +134,22 @@ export class CacheGeneration {
       }
 
       // add the regenerated page to cache
-      const addToCache = () => {
-        return this.cache.add(cacheKey, cacheString, {
-          revalidate,
-          buildId: this.isrConfig.buildId,
-        });
+      const addToCache = async () => {
+        try {
+          await executeWithTimeout(
+            this.cache.add(cacheKey, cacheString, {
+              revalidate,
+              buildId: this.isrConfig.buildId,
+            }),
+            this.isrConfig.cacheTimeoutMs || DEFAULT_CACHE_TIMEOUT, // Specify the timeout duration in milliseconds
+            `Timeout while adding to cache for cacheKey: ${cacheKey}`,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Failed to add to cache for cacheKey: ${cacheKey}`,
+            error,
+          );
+        }
       };
 
       try {
