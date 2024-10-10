@@ -204,12 +204,10 @@ export class ISRHandler {
       this.logger.debug(`cacheKey: ${cacheKey}`);
       let cacheData: CacheData;
       try {
-        const cachePromise = this.cache.get(cacheKey);
-        const errorMessage = `Failed to get cache data for cacheKey: ${cacheKey}`;
         cacheData = await executeWithTimeout(
-          cachePromise,
+          this.cache.get(cacheKey),
           this.cacheTimeoutMs,
-          errorMessage,
+          `Failed to get cache data for cacheKey: ${cacheKey}`,
         );
       } catch (error) {
         this.logger.warn(
