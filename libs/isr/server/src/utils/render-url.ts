@@ -4,6 +4,7 @@ import { ɵSERVER_CONTEXT as SERVER_CONTEXT } from '@angular/platform-server';
 import { CommonEngine, CommonEngineRenderOptions } from '@angular/ssr';
 import { ILogger } from '@rx-angular/isr/models';
 import { Request, Response } from 'express';
+import { DEFAULT_RENDERING_TIMEOUT } from './constants';
 import { executeWithTimeout } from './timeout';
 
 export interface RenderUrlConfig {
@@ -37,7 +38,7 @@ export const renderUrl = async (options: RenderUrlConfig): Promise<string> => {
     browserDistFolder,
     inlineCriticalCss,
     logger,
-    timeoutMs = 10000, // default timeout is 10 seconds
+    timeoutMs = DEFAULT_RENDERING_TIMEOUT, // default timeout is 10 seconds
   } = options;
 
   req.url = url;

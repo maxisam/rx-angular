@@ -1,4 +1,5 @@
 import {
+  CacheData,
   CacheHandler,
   ILogger,
   InvalidateConfig,
@@ -14,11 +15,14 @@ import { InMemoryCacheHandler } from './cache-handlers/in-memory-cache-handler';
 import { ISRLogger } from './isr-logger';
 import { getVariant } from './utils/cache-utils';
 import { setCompressHeader, stringToBuffer } from './utils/compression-utils';
+import { DEFAULT_CACHE_TIMEOUT } from './utils/constants';
+import { executeWithTimeout } from './utils/timeout';
 
 export class ISRHandler {
   protected cache!: CacheHandler;
   protected cacheGeneration!: CacheGeneration;
   protected logger: ILogger;
+  protected cacheTimeoutMs: number;
 
   constructor(protected isrConfig: ISRHandlerConfig) {
     if (!isrConfig) {
@@ -52,6 +56,8 @@ export class ISRHandler {
       this.cache,
       this.logger,
     );
+    this.cacheTimeoutMs =
+      this.isrConfig.cacheTimeoutMs || DEFAULT_CACHE_TIMEOUT;
   }
 
   async invalidate(
@@ -87,7 +93,17 @@ export class ISRHandler {
       const { cacheKey, url, reqSimulator } = variantUrl;
 
       // check if the url is in cache
-      const urlExists = await this.cache.has(cacheKey);
+      const urlExists = await executeWithTimeout(
+        this.cache.has(cacheKey),
+        this.cacheTimeoutMs,
+        `Timeout while checking cache for cacheKey: ${cacheKey}`,
+      ).catch((error) => {
+        this.logger.error(
+          `Error while checking cache for cacheKey: ${cacheKey}`,
+          error,
+        );
+        return false;
+      });
 
       if (!urlExists) {
         notInCache.push(cacheKey);
@@ -186,7 +202,23 @@ export class ISRHandler {
         variant,
       );
       this.logger.debug(`cacheKey: ${cacheKey}`);
-      const cacheData = await this.cache.get(cacheKey);
+      let cacheData: CacheData;
+      try {
+        const cachePromise = this.cache.get(cacheKey);
+        const errorMessage = `Failed to get cache data for cacheKey: ${cacheKey}`;
+        cacheData = await executeWithTimeout(
+          cachePromise,
+          this.cacheTimeoutMs,
+          errorMessage,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to get cache data for cacheKey: ${cacheKey}`,
+          error,
+        );
+        next();
+        return;
+      }
       this.logger.debug(
         `cacheData: CreatedAt: ${cacheData.createdAt}, Options:`,
         cacheData.options,

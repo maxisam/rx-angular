@@ -160,6 +160,11 @@ export interface ISRHandlerConfig {
    * This is useful to prevent the server from hanging on a request that takes too long to render.
    **/
   renderingTimeoutMs?: number | undefined;
+
+  /**
+   * This is for the timeout in milliseconds for accessing the cache storage, if undefined, it will use the default timeout, 5000ms
+   **/
+  cacheTimeoutMs?: number | undefined;
 }
 
 export interface ServeFromCacheConfig {
