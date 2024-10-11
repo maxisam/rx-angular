@@ -73,60 +73,53 @@ export class RedisCacheHandler extends CacheHandler {
     console.log('RedisCacheHandler initialized 🚀');
   }
 
-  add(
-    url: string,
-    html: string,
-    options: ISROptions = { revalidate: null }
-  ): Promise<void> {
-    const htmlWithMsg = html + cacheMsg(options.revalidate);
-
-    return new Promise((resolve, reject) => {
-      const cacheData: CacheData = {
-        html: htmlWithMsg,
-        options,
-        createdAt: Date.now(),
-      };
-      const key = this.createKey(url);
-      this.redis.set(key, JSON.stringify(cacheData)).then(() => {
-        resolve();
-      });
+  async add(cacheKey: string, html: string | Buffer, options: ISROptions = { revalidate: null }): Promise<void> {
+    const key = this.createKey(cacheKey);
+    const createdAt = Date.now().toString();
+    this.logger.debug(`Adding cache with key ${cacheKey} at ${createdAt} and buildId ${config.buildId}`);
+    await this.redis.hmset(key, {
+      html,
+      revalidate: config.revalidate ? config.revalidate.toString() : '',
+      buildId: config.buildId || '',
+      createdAt,
     });
   }
 
-  get(url: string): Promise<CacheData> {
-    return new Promise((resolve, reject) => {
-      const key = this.createKey(url);
-      this.redis.get(key, (err, result) => {
-        if (err || result === null || result === undefined) {
-          reject('This url does not exist in cache!');
-        } else {
-          resolve(JSON.parse(result));
-        }
-      });
-    });
+  async get(cacheKey: string): Promise<CacheData> {
+    const key = this.createKey(cacheKey);
+    const data = await this.redis.hgetallBuffer(key);
+    if (Object.keys(data).length > 0) {
+      const revalidate = data['revalidate'] ? parseInt(data['revalidate'].toString(), 10) : null;
+      return {
+        html: data['html'],
+        options: {
+          revalidate,
+          buildId: data['buildId'].toString() || null,
+        },
+        createdAt: parseInt(data['createdAt'].toString(), 10),
+      } as CacheData;
+    } else {
+      throw new Error(`Cache with key ${cacheKey} not found`);
+    }
   }
 
-  getAll(): Promise<string[]> {
-    console.log('getAll() is not implemented for RedisCacheHandler');
-    return Promise.resolve([]);
+  async getAll(): Promise<string[]> {
+    return await this.redis.keys(`${this.redisCacheOptions.keyPrefix}:*`);
   }
 
-  has(url: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const key = this.createKey(url);
-      resolve(this.redis.exists(key).then((exists) => exists === 1));
-    });
+  async has(cacheKey: string): Promise<boolean> {
+    const key = this.createKey(cacheKey);
+    return (await this.redis.exists(key)) === 1;
   }
 
-  delete(url: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const key = this.createKey(url);
-      resolve(this.redis.del(key).then((deleted) => deleted === 1));
-    });
+  async delete(cacheKey: string): Promise<boolean> {
+    const key = this.createKey(cacheKey);
+    return (await this.redis.del(key)) === 1;
   }
 
-  clearCache?(): Promise<boolean> {
-    throw new Error('Method not implemented.');
+  async clearCache(): Promise<boolean> {
+    await this.redis.flushdb();
+    return true;
   }
 
   private createKey(url: string): string {
@@ -134,22 +127,6 @@ export class RedisCacheHandler extends CacheHandler {
     return `${prefix}:${url}`;
   }
 }
-
-const cacheMsg = (revalidateTime?: number | null): string => {
-  const time = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-
-  let msg = '<!-- ';
-
-  msg += `\n🚀 ISR: Served from Redis Cache! \n⌛ Last updated: ${time}. `;
-
-  if (revalidateTime) {
-    msg += `\n⏭️ Next refresh is after ${revalidateTime} seconds. `;
-  }
-
-  msg += ' \n-->';
-
-  return msg;
-};
 ```
 
 And then, to register the cache handler, you need to pass it to the `cache` field in ISRHandler:
@@ -203,7 +180,7 @@ The `CacheHandler` abstract class has the following API:
 
 ```typescript
 export abstract class CacheHandler {
-  abstract add(url: string, html: string, options: ISROptions): Promise<void>;
+  abstract add(url: string, html: string | Buffer, options: ISROptions): Promise<void>;
 
   abstract get(url: string): Promise<CacheData>;
 
@@ -223,7 +200,7 @@ The `CacheData` interface is used to store the cached pages in the cache handler
 
 ```typescript
 export interface CacheData {
-  html: string;
+  html: string | Buffer;
   options: ISROptions;
   createdAt: number;
 }
