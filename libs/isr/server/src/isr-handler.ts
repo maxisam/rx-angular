@@ -214,7 +214,7 @@ export class ISRHandler {
           `Failed to get cache data for cacheKey: ${cacheKey}`,
           error,
         );
-        next();
+        next(); // Serve page using SSR from next middleware
         return;
       }
       this.logger.debug(
@@ -231,7 +231,7 @@ export class ISRHandler {
         this.logger.debug(
           `Cache is from a different build: ${cacheConfig.buildId}, request buildId: ${this.isrConfig.buildId}`,
         );
-        next();
+        next(); // Serve page using SSR from next middleware
         return;
       }
 
@@ -279,7 +279,7 @@ export class ISRHandler {
             }
           } catch (error) {
             this.logger.error('Error generating html', error);
-            next();
+            next(error); // should be handled by the error handler
           }
         }
       }
@@ -303,8 +303,7 @@ export class ISRHandler {
 
       return res.send(finalHtml);
     } catch (error) {
-      // Cache does not exist. Serve user using SSR
-      next();
+      next(error); // other unknown error, should be handled by the error handler
     }
   }
 
@@ -346,7 +345,7 @@ export class ISRHandler {
         return res.send(result.html);
       }
     } catch (error) {
-      next();
+      next(error); // should be handled by the error handler
     }
   }
 }
