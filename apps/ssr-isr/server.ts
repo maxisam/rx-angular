@@ -14,6 +14,7 @@ import bootstrap from './src/main.server';
 // import { FileSystemCacheHandler } from '@rx-angular/isr/server';
 
 // The Express app is exported so that it can be used by serverless Functions.
+
 export function app(): express.Express {
   const server = express();
   const serverDistFolder = dirname(fileURLToPath(import.meta.url));
@@ -27,7 +28,7 @@ export function app(): express.Express {
   // });
 
   const commonEngine = new CommonEngine();
-
+  const logger = new customLogger();
   const isr = new ISRHandler({
     indexHtml,
     invalidateSecretToken: 'MY_TOKEN', // replace with env secret key ex. process.env.REVALIDATE_SECRET_TOKEN
@@ -40,7 +41,7 @@ export function app(): express.Express {
     nonBlockingRender: true, // will serve page first and store in cache in background
     modifyGeneratedHtml: customModifyGeneratedHtml,
     compressHtml: compressHtml, // compress the html before storing in cache
-    logger: new customLogger(),
+    logger,
     renderingTimeoutMs: 5000, // 5 seconds timeout for rendering
     // cacheHtmlCompressionMethod: 'gzip', // compression method for cache
     // cache: fsCacheHandler,
@@ -77,6 +78,9 @@ export function app(): express.Express {
       }),
   );
 
+  // Error handler
+  server.use(globalErrorHandler(indexHtml, logger));
+
   return server;
 }
 
@@ -105,6 +109,26 @@ class customLogger implements ILogger {
   error(message: string, ...optionalParams: unknown[]): void {
     console.error(message, ...optionalParams);
   }
+}
+
+function globalErrorHandler(indexHtml: string, logger: customLogger) {
+  return (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    logger.error(err.message, err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    if (err.message.includes('Rendering timeout')) {
+      logger.error('Angular SSR Rendering timeout');
+    }
+    res.set({ 'content-type': 'text/html; charset=utf-8' });
+    // return the index.html file directly
+    res.sendFile(indexHtml);
+  };
 }
 
 function run(): void {
