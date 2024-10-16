@@ -31,6 +31,7 @@ export interface VariantRebuildItem {
 export abstract class CacheHandler {
   abstract add(
     url: string,
+    // it will be buffer when we use compressHtml
     html: string | Buffer,
     config?: CacheISRConfig,
   ): Promise<void>;
