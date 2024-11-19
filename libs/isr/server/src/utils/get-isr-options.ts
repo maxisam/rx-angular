@@ -9,7 +9,7 @@
  * @internal
  */
 export function getRouteISRDataFromHTML(html: string): {
-  revalidate: number | null;
+  revalidate: number | null | undefined;
   errors: string[];
 } {
   const indexOfScriptTag = html?.indexOf(ISR_SCRIPT_TAG);
@@ -30,7 +30,7 @@ export function getRouteISRDataFromHTML(html: string): {
     .replace(ISR_SCRIPT_TAG, ''); // remove start script tag
 
   return JSON.parse(val) as {
-    revalidate: number | null;
+    revalidate: number | null | undefined;
     errors: string[];
   };
 }

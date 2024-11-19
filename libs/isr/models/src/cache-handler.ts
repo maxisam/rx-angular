@@ -5,7 +5,7 @@ import { Request } from 'express';
  * cache data in the cache handler.
  */
 export interface CacheISRConfig {
-  revalidate: number | null; // none, 0, > 0
+  revalidate: number | null | undefined; // none, 0, > 0
   buildId?: string | null; // the id of the current build
   errors?: string[];
 }

@@ -166,6 +166,12 @@ export interface ISRHandlerConfig {
    * This is for the timeout in milliseconds for accessing the cache storage, if undefined, it will use the default timeout, 5000ms
    **/
   cacheTimeoutMs?: number | undefined;
+
+  /**
+   * When this is set, the revalidate data on route can be omitted and the default revalidate time will be used. use -1 to disable revalidate for specific route.
+   * when this is set to undefined, the revalidate time on route will be used.
+   **/
+  defaultRevalidate?: number | undefined;
 }
 
 export interface ServeFromCacheConfig {
