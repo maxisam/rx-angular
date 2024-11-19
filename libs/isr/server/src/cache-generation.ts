@@ -93,7 +93,9 @@ export class CacheGeneration {
     };
     try {
       const html = await renderUrl(renderUrlConfig);
-      const { revalidate, errors } = getRouteISRDataFromHTML(html);
+      const { revalidate: initialRevalidate, errors } =
+        getRouteISRDataFromHTML(html);
+      let revalidate = initialRevalidate;
       this.logger.debug(
         `Revalidate time for cacheKey: ${cacheKey}: ${revalidate}`,
       );
@@ -121,12 +123,18 @@ export class CacheGeneration {
         return { html: finalHtml, errors };
       }
 
-      // if revalidate is null we won't cache it
+      // if revalidate is null / -1 / undefined we won't cache it
       // if revalidate is 0, we will never clear the cache automatically
       // if revalidate is x, we will clear cache every x seconds (after the last request) for that url
+      revalidate = revalidate || this.isrConfig.defaultRevalidate;
+      if (revalidate === -1) {
+        this.logger.debug('Revalidate is -1, not caching...');
+        return { html: finalHtml };
+      }
+
       if (revalidate === null || revalidate === undefined) {
-        this.logger.debug('Revalidate is null, not caching...');
         // don't do !revalidate because it will also catch "0"
+        this.logger.debug('Revalidate is null or undefined, not caching...');
         return { html: finalHtml };
       }
 
