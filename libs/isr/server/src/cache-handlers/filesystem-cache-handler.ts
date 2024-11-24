@@ -222,7 +222,9 @@ export class FileSystemCacheHandler extends CacheHandler {
         }
       }
     } catch (err) {
-      console.error('ERROR! 💥 ! Cannot read folder: ' + folderPath);
+      console.error(
+        `ERROR! 💥 ! Cannot read folder: ${folderPath}, err: ${err.message}`,
+      );
     }
 
     for (const { path } of pathsToCache) {
@@ -316,7 +318,7 @@ function findIndexHtmlFilesRecursively(
     });
   } catch (err) {
     // If an error occurs, log an error message and return an empty array
-    console.error('ERROR! 💥 ! Cannot read folder: ' + path);
+    console.error(`ERROR! 💥 ! Cannot read folder: ${path}, ${err.message}`);
     return [];
   }
 

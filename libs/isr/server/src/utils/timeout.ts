@@ -12,6 +12,8 @@ export async function executeWithTimeout<T>(
   try {
     return (await Promise.race([promise, timeoutPromise])) as T;
   } finally {
-    timeoutId && clearTimeout(timeoutId); // Clear the timeout once the operation is done or fails
+    if (timeoutId) {
+      clearTimeout(timeoutId); // Clear the timeout once the operation is done or fails
+    }
   }
 }
